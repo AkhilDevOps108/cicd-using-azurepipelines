@@ -1,0 +1,42 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  TF_IN_AUTOMATION: 'true'
+
+steps:
+- task: TerraformInstaller@0
+  displayName: 'Install Terraform'
+  inputs:
+    terraformVersion: '1.5.0'
+
+- script: |
+    echo "Logging in with Service Principal"
+    az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
+    az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+  displayName: 'Azure CLI login'
+  env:
+    AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+    AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+    AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+    AZURE_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
+
+- script: |
+    export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
+    export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
+    export ARM_TENANT_ID=$(AZURE_TENANT_ID)
+    export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
+    terraform init
+    terraform plan -out=tfplan
+    terraform apply -auto-approve tfplan
+  displayName: 'Terraform init/plan/apply'
+  env:
+    ARM_CLIENT_ID: $(AZURE_CLIENT_ID)
+    ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+    ARM_TENANT_ID: $(AZURE_TENANT_ID)
+    ARM_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
