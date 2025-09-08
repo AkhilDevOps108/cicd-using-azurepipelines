@@ -8,17 +8,26 @@ pool:
 
 variables:
   TF_IN_AUTOMATION: 'true'
+  TERRAFORM_VERSION: '1.5.0'
 
 steps:
-- task: TerraformInstaller@0
+# Install Terraform manually (no need for TerraformInstaller task)
+- script: |
+    echo "Installing terraform ${TERRAFORM_VERSION}"
+    curl -sSL -o terraform.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+    unzip -o terraform.zip
+    sudo mv terraform /usr/local/bin/
+    terraform version
   displayName: 'Install Terraform'
-  inputs:
-    terraformVersion: '1.5.0'
 
+# Azure CLI login using Service Principal credentials
 - script: |
     echo "Logging in with Service Principal"
-    az login --service-principal -u $(AZURE_CLIENT_ID) -p $(AZURE_CLIENT_SECRET) --tenant $(AZURE_TENANT_ID)
-    az account set --subscription $(AZURE_SUBSCRIPTION_ID)
+    az login --service-principal \
+      --username "$AZURE_CLIENT_ID" \
+      --password "$AZURE_CLIENT_SECRET" \
+      --tenant "$AZURE_TENANT_ID"
+    az account set --subscription "$AZURE_SUBSCRIPTION_ID"
   displayName: 'Azure CLI login'
   env:
     AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
@@ -26,17 +35,19 @@ steps:
     AZURE_TENANT_ID: $(AZURE_TENANT_ID)
     AZURE_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
 
+# Terraform commands (init, plan, apply)
 - script: |
-    export ARM_CLIENT_ID=$(AZURE_CLIENT_ID)
-    export ARM_CLIENT_SECRET=$(AZURE_CLIENT_SECRET)
-    export ARM_TENANT_ID=$(AZURE_TENANT_ID)
-    export ARM_SUBSCRIPTION_ID=$(AZURE_SUBSCRIPTION_ID)
-    terraform init
-    terraform plan -out=tfplan
+    export ARM_CLIENT_ID="$AZURE_CLIENT_ID"
+    export ARM_CLIENT_SECRET="$AZURE_CLIENT_SECRET"
+    export ARM_TENANT_ID="$AZURE_TENANT_ID"
+    export ARM_SUBSCRIPTION_ID="$AZURE_SUBSCRIPTION_ID"
+
+    terraform init -input=false
+    terraform plan -out=tfplan -input=false
     terraform apply -auto-approve tfplan
   displayName: 'Terraform init/plan/apply'
   env:
-    ARM_CLIENT_ID: $(AZURE_CLIENT_ID)
-    ARM_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
-    ARM_TENANT_ID: $(AZURE_TENANT_ID)
-    ARM_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
+    AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+    AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+    AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+    AZURE_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
