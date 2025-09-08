@@ -8,29 +8,40 @@ pool:
 
 variables:
   TF_IN_AUTOMATION: 'true'
-  TERRAFORM_VERSION: '1.5.0'
+  TERRAFORM_VERSION: '1.5.0'   # change if you want a different TF version
 
 steps:
-# Install Terraform (from the marketplace extension you already installed)
 - task: TerraformInstaller@0
   displayName: 'Install Terraform'
   inputs:
     terraformVersion: '$(TERRAFORM_VERSION)'
 
-# Login to Azure using the service connection
 - task: AzureCLI@2
-  displayName: 'Azure CLI login via service connection'
+  displayName: 'Azure CLI login and Terraform (using service connection akhil)'
   inputs:
-    azureSubscription: 'akhil'
+    azureSubscription: 'akhil'         # your service connection name
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-      echo "Logged in successfully"
+      set -euo pipefail
+      echo "Azure account:"
       az account show --query "{name:name, id:id}" -o table
 
-# Run Terraform commands (using the Azure CLI auth context)
-- script: |
-    terraform init -input=false
-    terraform plan -out=tfplan -input=false
-    terraform apply -auto-approve tfplan
-  displayName: 'Terraform init/plan/apply'
+      echo "Terraform version:"
+      terraform version
+
+      # init - if you use a backend, make sure backend config is accessible
+      terraform init -input=false
+
+      # validate & fmt check (optional but recommended)
+      terraform fmt -check || true
+      terraform validate || true
+
+      # plan
+      terraform plan -out=tfplan -input=false
+
+      # apply
+      terraform apply -auto-approve tfplan
+
+      # show outputs (useful to confirm)
+      terraform output -json
